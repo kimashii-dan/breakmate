@@ -5,3 +5,14 @@
 /plan.md
 /report_breakmate.docx
 /report_breakmate.md
+/specs
+/tasks
+/.CLAUDE
+/.output
+
+node_modules/
+dist/
+dist-zip/
+.wxt/
+*.local
+.env
