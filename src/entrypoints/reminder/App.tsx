@@ -64,31 +64,31 @@ function ExerciseTimer({ exercise, onComplete }: ExerciseTimerProps) {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-white">
-      <div className="border-b border-gray-100 px-6 py-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-teal-600">
+    <div className="flex h-screen flex-col bg-bm-bg">
+      <div className="border-b border-bm-border px-6 py-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-bm-accent">
           {exercise.type === 'eye' ? 'Eye Break' : 'Full Body Break'}
         </p>
-        <h2 className="mt-0.5 text-base font-semibold text-gray-900">{exercise.name}</h2>
+        <h2 className="mt-0.5 text-base font-semibold text-bm-text-primary">{exercise.name}</h2>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-        <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-teal-400 bg-teal-50">
-          <span className="text-3xl font-bold tabular-nums text-teal-700">{timeDisplay}</span>
+        <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-bm-accent bg-bm-accent-muted">
+          <span className="text-3xl font-bold tabular-nums text-bm-accent">{timeDisplay}</span>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-gray-200">
+        <div className="h-2 w-full rounded-full bg-bm-border">
           <div
-            className="h-2 rounded-full bg-teal-400 transition-all duration-1000"
+            className="h-2 rounded-full bg-bm-accent transition-all duration-1000"
             style={{ width: `${progressPct}%` }}
           />
         </div>
 
-        <div className="w-full rounded-xl border border-gray-200 bg-gray-50 px-6 py-4 text-center">
-          <p className="mb-1 text-xs font-medium text-gray-400">
+        <div className="w-full rounded-xl border border-bm-border bg-bm-surface px-6 py-4 text-center">
+          <p className="mb-1 text-xs font-medium text-bm-text-muted">
             Step {currentStep + 1} of {stepCount}
           </p>
-          <p className="text-sm font-medium text-gray-700">
+          <p className="text-sm font-medium text-bm-text-secondary">
             {exercise.instructions[currentStep]}
           </p>
         </div>
@@ -96,7 +96,7 @@ function ExerciseTimer({ exercise, onComplete }: ExerciseTimerProps) {
         {finished && (
           <button
             onClick={handleDone}
-            className="w-full rounded-xl bg-teal-500 py-3 text-base font-semibold text-white transition-colors hover:bg-teal-600 active:bg-teal-700"
+            className="w-full rounded-xl bg-bm-accent py-3 text-base font-semibold text-bm-bg transition-colors hover:bg-bm-accent-hover active:bg-bm-accent-hover"
           >
             {"I'm done! ✓"}
           </button>
@@ -117,15 +117,15 @@ interface ChoosingPhaseProps {
 
 function ChoosingPhase({ breakType, onStart, onSnooze, onDismiss }: ChoosingPhaseProps) {
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex h-screen flex-col bg-bm-bg">
       <div className="flex items-center justify-between px-6 pt-6">
-        <span className="inline-flex items-center rounded-full bg-teal-100 px-3 py-1 text-sm font-medium text-teal-800">
+        <span className="inline-flex items-center rounded-full bg-[var(--bm-accent-subtle)] px-3 py-1 text-sm font-medium text-bm-accent">
           {BADGE_LABELS[breakType]}
         </span>
         <button
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="rounded-full p-1 text-bm-text-muted transition-colors hover:bg-bm-elevated hover:text-bm-text-secondary"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -143,24 +143,24 @@ function ChoosingPhase({ breakType, onStart, onSnooze, onDismiss }: ChoosingPhas
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-        <h1 className="text-2xl font-bold text-gray-900">Time for a break!</h1>
-        <p className="text-center text-sm text-gray-500">{BREAK_DESCRIPTIONS[breakType]}</p>
+        <h1 className="text-2xl font-bold text-bm-text-primary">Time for a break!</h1>
+        <p className="text-center text-sm text-bm-text-secondary">{BREAK_DESCRIPTIONS[breakType]}</p>
         <button
           onClick={onStart}
-          className="w-full max-w-xs rounded-xl bg-teal-500 py-3 text-base font-semibold text-white transition-colors hover:bg-teal-600 active:bg-teal-700"
+          className="w-full max-w-xs rounded-xl bg-bm-accent py-3 text-base font-semibold text-bm-bg transition-colors hover:bg-bm-accent-hover active:bg-bm-accent-hover"
         >
           Start Break
         </button>
       </div>
 
-      <div className="border-t border-gray-100 px-6 py-4">
-        <p className="mb-2 text-center text-xs font-medium text-gray-400">Snooze for…</p>
+      <div className="border-t border-bm-border px-6 py-4">
+        <p className="mb-2 text-center text-xs font-medium text-bm-text-muted">Snooze for…</p>
         <div className="flex justify-center gap-3">
           {SNOOZE_OPTIONS.map((m) => (
             <button
               key={m}
               onClick={() => onSnooze(m)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-teal-300 hover:text-teal-600"
+              className="rounded-lg border border-bm-border px-4 py-2 text-sm font-medium text-bm-text-secondary transition-colors hover:border-bm-accent hover:text-bm-accent"
             >
               {m} min
             </button>
@@ -175,10 +175,10 @@ function ChoosingPhase({ breakType, onStart, onSnooze, onDismiss }: ChoosingPhas
 
 function DonePhase() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-white">
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-bm-bg">
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-16 w-16 text-teal-500"
+        className="h-16 w-16 text-bm-success"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -190,8 +190,8 @@ function DonePhase() {
           d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-      <h1 className="text-xl font-bold text-teal-600">Great job!</h1>
-      <p className="text-sm text-gray-500">Break complete. Window closing…</p>
+      <h1 className="text-xl font-bold text-bm-success">Great job!</h1>
+      <p className="text-sm text-bm-text-secondary">Break complete. Window closing…</p>
     </div>
   );
 }
@@ -237,8 +237,8 @@ export default function App() {
 
   if (phase === 'loading') {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-400 border-t-transparent" />
+      <div className="flex h-screen items-center justify-center bg-bm-bg">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-bm-accent border-t-transparent" />
       </div>
     );
   }

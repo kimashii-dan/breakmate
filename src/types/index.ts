@@ -3,7 +3,6 @@ export type BreakOutcome = 'taken' | 'snoozed' | 'dismissed';
 export type SnoozeDuration = 5 | 10 | 15;
 
 export type Message =
-  | { type: 'HEARTBEAT' }
   | { type: 'GET_STATE' }
   | { type: 'TOGGLE_FOCUS_MODE' }
   | { type: 'SNOOZE'; minutes: SnoozeDuration }
@@ -15,4 +14,6 @@ export type TimerState = {
   activeSeconds: number;
   focusModeEnabled: boolean;
   reminderIntervalMin: number;
+  snoozeEndsAt: number | null;
+  snoozeTotalSec: number | null;
 };

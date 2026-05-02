@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldTrigger, shouldPause } from '../../src/lib/timer';
+import { shouldTrigger } from '../../src/lib/timer';
 
 describe('shouldTrigger', () => {
   it('returns false when activeSeconds is 0', () => {
@@ -26,27 +26,5 @@ describe('shouldTrigger', () => {
   it('works with 90-minute interval (focus mode)', () => {
     expect(shouldTrigger(5399, 90)).toBe(false);
     expect(shouldTrigger(5400, 90)).toBe(true);
-  });
-});
-
-describe('shouldPause', () => {
-  it('returns false when lastHeartbeatAt is very recent (1ms ago)', () => {
-    expect(shouldPause(Date.now() - 1)).toBe(false);
-  });
-
-  it('returns false just below 60-second threshold (59999ms ago)', () => {
-    expect(shouldPause(Date.now() - 59_999)).toBe(false);
-  });
-
-  it('returns true at exact 60-second threshold (60000ms ago)', () => {
-    expect(shouldPause(Date.now() - 60_000)).toBe(true);
-  });
-
-  it('returns true above threshold (61000ms ago)', () => {
-    expect(shouldPause(Date.now() - 61_000)).toBe(true);
-  });
-
-  it('returns true when lastHeartbeatAt is 0 (uninitialized)', () => {
-    expect(shouldPause(0)).toBe(true);
   });
 });

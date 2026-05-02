@@ -5,12 +5,14 @@ import * as exercisesQueries from '../db/queries/exercises';
 import { getDb } from '../db/client';
 import { calcStreak } from '../lib/streak';
 import { isChronicSnoozer } from '../lib/snoozer';
-import { shouldTrigger, shouldPause } from '../lib/timer';
+import { shouldTrigger } from '../lib/timer';
 import type { BreakType, Message, SnoozeDuration, TimerState } from '../types';
 import type { BreakRecord } from '../db/types';
 
 const ALARM_IDLE_CHECK = 'idle-check';
 const ALARM_SNOOZE = 'snooze';
+const IDLE_DETECTION_INTERVAL_SECONDS = 60;
+const ALARM_PERIOD_SECONDS = 30; // alarm fires every 0.5 min = 30s
 
 interface PendingBreak {
   triggered_at: number;
@@ -19,11 +21,13 @@ interface PendingBreak {
 }
 
 let activeSeconds: number = 0;
-let lastHeartbeatAt: number = 0;
+let isSystemActive: boolean = true;
 let reminderIntervalMin: number = 60;
 let focusModeEnabled: boolean = false;
 let reminderWindowId: number | null = null;
 let pendingBreak: PendingBreak | null = null;
+let snoozeEndsAt: number | null = null;
+let snoozeTotalSec: number | null = null;
 
 function isMessage(value: unknown): value is Message {
   return (
@@ -102,8 +106,12 @@ async function updateChronicSnoozerFlag(): Promise<void> {
 }
 
 async function handleIdleCheck(): Promise<void> {
-  if (shouldPause(lastHeartbeatAt)) return;
-  if (shouldTrigger(activeSeconds, reminderIntervalMin) && pendingBreak === null) {
+  if (!isSystemActive) return;
+  if (pendingBreak !== null) return;
+
+  activeSeconds += ALARM_PERIOD_SECONDS;
+
+  if (shouldTrigger(activeSeconds, reminderIntervalMin)) {
     const s = await settingsQueries.get();
     const breakType: BreakType = s?.default_break_type ?? 'eye';
     pendingBreak = { triggered_at: Date.now(), break_type: breakType, snooze_count: 0 };
@@ -113,6 +121,8 @@ async function handleIdleCheck(): Promise<void> {
 
 async function handleSnoozeExpiry(): Promise<void> {
   if (pendingBreak === null) return;
+  snoozeEndsAt = null;
+  snoozeTotalSec = null;
   await openReminderWindow(pendingBreak.break_type);
 }
 
@@ -128,6 +138,8 @@ async function handleToggleFocusMode(): Promise<void> {
 async function handleSnooze(minutes: SnoozeDuration): Promise<void> {
   if (pendingBreak === null) return;
   pendingBreak.snooze_count += 1;
+  snoozeEndsAt = Date.now() + minutes * 60_000;
+  snoozeTotalSec = minutes * 60;
   await browser.alarms.create(ALARM_SNOOZE, { delayInMinutes: minutes });
   await closeReminderWindow();
 }
@@ -143,6 +155,8 @@ async function handleBreakTaken(exerciseId: number): Promise<void> {
     completed_at: Date.now(),
   });
   activeSeconds = 0;
+  snoozeEndsAt = null;
+  snoozeTotalSec = null;
   await closeReminderWindow();
   pendingBreak = null;
   await checkAndAwardBadges();
@@ -160,6 +174,8 @@ async function handleBreakDismissed(): Promise<void> {
     completed_at: null,
   });
   activeSeconds = 0;
+  snoozeEndsAt = null;
+  snoozeTotalSec = null;
   await closeReminderWindow();
   pendingBreak = null;
 }
@@ -176,14 +192,8 @@ function dispatchMessage(
   sendResponse: (response?: unknown) => void
 ): boolean | void {
   switch (message.type) {
-    case 'HEARTBEAT':
-      console.log('heartbeat received', activeSeconds);
-      activeSeconds += 5;
-      lastHeartbeatAt = Date.now();
-      return;
-
     case 'GET_STATE': {
-      const resp: TimerState = { activeSeconds, focusModeEnabled, reminderIntervalMin };
+      const resp: TimerState = { activeSeconds, focusModeEnabled, reminderIntervalMin, snoozeEndsAt, snoozeTotalSec };
       sendResponse(resp);
       return;
     }
@@ -217,6 +227,18 @@ async function loadSettings(): Promise<void> {
   reminderIntervalMin = s.focus_mode_enabled ? s.focus_mode_interval_min : s.reminder_interval_min;
 }
 
+function registerIdleListener(): void {
+  browser.idle.setDetectionInterval(IDLE_DETECTION_INTERVAL_SECONDS);
+  browser.idle.onStateChanged.addListener((newState) => {
+    isSystemActive = newState === 'active';
+  });
+  // Sync initial state so the flag is accurate before the first alarm fires
+  void (async (): Promise<void> => {
+    const state = await browser.idle.queryState(IDLE_DETECTION_INTERVAL_SECONDS);
+    isSystemActive = state === 'active';
+  })();
+}
+
 async function onInstalled(): Promise<void> {
   await settingsQueries.initDefaults();
   await exercisesQueries.seedDefaults();
@@ -239,6 +261,7 @@ async function init(): Promise<void> {
 }
 
 function registerListeners(): void {
+  registerIdleListener();
   browser.runtime.onInstalled.addListener(() => void onInstalled());
   browser.runtime.onStartup.addListener(() => void onStartup());
   browser.alarms.onAlarm.addListener((alarm) => {
