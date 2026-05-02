@@ -168,17 +168,16 @@ async function handleSettingsChanged(): Promise<void> {
   const s = await settingsQueries.get();
   if (!s) return;
   focusModeEnabled = s.focus_mode_enabled;
-  reminderIntervalMin = s.focus_mode_enabled
-    ? s.focus_mode_interval_min
-    : s.reminder_interval_min;
+  reminderIntervalMin = s.focus_mode_enabled ? s.focus_mode_interval_min : s.reminder_interval_min;
 }
 
 function dispatchMessage(
   message: Message,
-  sendResponse: (response?: unknown) => void,
+  sendResponse: (response?: unknown) => void
 ): boolean | void {
   switch (message.type) {
     case 'HEARTBEAT':
+      console.log('heartbeat received', activeSeconds);
       activeSeconds += 5;
       lastHeartbeatAt = Date.now();
       return;
@@ -215,9 +214,7 @@ async function loadSettings(): Promise<void> {
   const s = await settingsQueries.get();
   if (!s) return;
   focusModeEnabled = s.focus_mode_enabled;
-  reminderIntervalMin = s.focus_mode_enabled
-    ? s.focus_mode_interval_min
-    : s.reminder_interval_min;
+  reminderIntervalMin = s.focus_mode_enabled ? s.focus_mode_interval_min : s.reminder_interval_min;
 }
 
 async function onInstalled(): Promise<void> {
