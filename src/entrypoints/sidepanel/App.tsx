@@ -3,6 +3,7 @@ import * as settingsQueries from '../../db/queries/settings';
 import * as breakRecordsQueries from '../../db/queries/break-records';
 import * as badgesQueries from '../../db/queries/badges';
 import { calcStreak } from '../../lib/streak';
+import { effectiveInterval } from '../../lib/timer';
 import { SettingsPanel } from '../../components/SettingsPanel';
 import type { Message, TimerState } from '../../types';
 import type { Settings, Badge } from '../../db/types';
@@ -10,12 +11,13 @@ import type { Settings, Badge } from '../../db/types';
 type LoadStatus = 'loading' | 'error' | 'ready';
 type View = 'main' | 'settings';
 
-interface PopupData {
+interface SidebarData {
   timerState: TimerState;
   settings: Settings;
   totalTaken: number;
   streak: number;
   earnedBadges: { badge: Badge; earnedAt: number }[];
+  syncedAt: number;
 }
 
 const ICON_MAP: Record<string, string> = {
@@ -32,9 +34,11 @@ function getBadgeIcon(iconKey: string): string {
 
 interface TimerDisplayProps {
   activeSeconds: number;
+  isSystemActive: boolean;
   intervalMin: number;
   snoozeEndsAt: number | null;
   snoozeTotalSec: number | null;
+  syncedAt: number;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -45,14 +49,20 @@ function formatTime(totalSeconds: number): string {
   return `${m}m ${s}s`;
 }
 
-function TimerDisplay({ activeSeconds, intervalMin, snoozeEndsAt, snoozeTotalSec }: TimerDisplayProps) {
+function TimerDisplay({
+  activeSeconds,
+  isSystemActive,
+  intervalMin,
+  snoozeEndsAt,
+  snoozeTotalSec,
+  syncedAt,
+}: TimerDisplayProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (snoozeEndsAt === null) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [snoozeEndsAt]);
+  }, []);
 
   if (snoozeEndsAt !== null) {
     const snoozeSecondsLeft = Math.max(0, Math.round((snoozeEndsAt - now) / 1000));
@@ -68,9 +78,9 @@ function TimerDisplay({ activeSeconds, intervalMin, snoozeEndsAt, snoozeTotalSec
         <p className="text-2xl font-bold tabular-nums text-bm-warning">
           {formatTime(snoozeSecondsLeft)}
         </p>
-        <div className="h-2 w-full rounded-full bg-bm-border">
+        <div className="h-1.5 w-full rounded-full bg-bm-border">
           <div
-            className="h-2 rounded-full bg-bm-warning transition-all duration-300"
+            className="h-1.5 rounded-full bg-bm-warning transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -78,24 +88,37 @@ function TimerDisplay({ activeSeconds, intervalMin, snoozeEndsAt, snoozeTotalSec
     );
   }
 
+  const liveActiveSeconds = isSystemActive
+    ? activeSeconds + Math.floor((now - syncedAt) / 1000)
+    : activeSeconds;
   const intervalSeconds = intervalMin * 60;
-  const remainingSeconds = Math.max(intervalSeconds - activeSeconds, 0);
-  const pct = Math.min((activeSeconds / intervalSeconds) * 100, 100);
-  const isOverdue = activeSeconds >= intervalSeconds;
+  const remainingSeconds = Math.max(intervalSeconds - liveActiveSeconds, 0);
+  const pct = Math.min((liveActiveSeconds / intervalSeconds) * 100, 100);
+  const isOverdue = liveActiveSeconds >= intervalSeconds;
 
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <p className="text-xs text-bm-text-muted">Next break in</p>
-        <p className="text-xs text-bm-text-muted">{formatTime(activeSeconds)} active</p>
+        <p className="text-xs text-bm-text-muted">
+          {isSystemActive ? `${formatTime(liveActiveSeconds)} active` : 'paused'}
+        </p>
       </div>
-      <p className={`text-2xl font-bold tabular-nums ${isOverdue ? 'text-bm-warning' : 'text-bm-accent'}`}>
+      <p
+        className={`text-2xl font-bold tabular-nums ${isOverdue ? 'text-bm-warning' : 'text-bm-accent'}`}
+      >
         {isOverdue ? 'Break time!' : formatTime(remainingSeconds)}
       </p>
-      <div className="h-2 w-full rounded-full bg-bm-border">
+      <div className="h-1.5 w-full rounded-full bg-bm-border">
         <div
-          className={`h-2 rounded-full transition-all duration-300 ${isOverdue ? 'bg-bm-warning' : 'bg-bm-accent'}`}
-          style={{ width: `${pct}%` }}
+          className="h-1.5 rounded-full transition-all duration-300"
+          style={{
+            width: `${pct}%`,
+            background: isOverdue
+              ? 'var(--bm-warning)'
+              : 'linear-gradient(90deg, var(--bm-accent-muted), var(--bm-accent))',
+            boxShadow: isOverdue ? 'none' : '0 0 6px var(--bm-accent)',
+          }}
         />
       </div>
     </div>
@@ -122,7 +145,9 @@ function BadgeGrid({ earnedBadges }: BadgeGridProps) {
           className="flex flex-col items-center rounded-xl border border-bm-border bg-bm-bg p-2 text-center"
         >
           <span className="text-2xl">{getBadgeIcon(badge.icon_key)}</span>
-          <span className="mt-1 text-xs font-medium text-bm-text-secondary leading-tight">{badge.name}</span>
+          <span className="mt-1 text-xs font-medium text-bm-text-secondary leading-tight">
+            {badge.name}
+          </span>
         </div>
       ))}
     </div>
@@ -131,38 +156,49 @@ function BadgeGrid({ earnedBadges }: BadgeGridProps) {
 
 // --- App -----------------------------------------------------------------
 
-export default function App() {
+async function loadData(): Promise<SidebarData> {
+  const [timerStateRaw, s, weekly, earned] = await Promise.all([
+    browser.runtime.sendMessage({ type: 'GET_STATE' } satisfies Message),
+    settingsQueries.get(),
+    breakRecordsQueries.getWeeklySummary(),
+    badgesQueries.getEarned(),
+  ]);
+  if (!s) throw new Error('Settings not found');
+  return {
+    timerState: timerStateRaw as TimerState,
+    settings: s,
+    totalTaken: weekly.totalTaken,
+    streak: calcStreak(weekly.recentRecords),
+    earnedBadges: earned,
+    syncedAt: Date.now(),
+  };
+}
+
+export default function App(): JSX.Element {
   const [status, setStatus] = useState<LoadStatus>('loading');
-  const [data, setData] = useState<PopupData | null>(null);
+  const [data, setData] = useState<SidebarData | null>(null);
   const [view, setView] = useState<View>('main');
 
   useEffect(() => {
-    void (async (): Promise<void> => {
-      try {
-        const [timerStateRaw, s, weekly, earned] = await Promise.all([
-          browser.runtime.sendMessage({ type: 'GET_STATE' } satisfies Message),
-          settingsQueries.get(),
-          breakRecordsQueries.getWeeklySummary(),
-          badgesQueries.getEarned(),
-        ]);
-
-        if (!s) { setStatus('error'); return; }
-
-        const timerState = timerStateRaw as TimerState;
-        const streak = calcStreak(weekly.recentRecords);
-
-        setData({
-          timerState,
-          settings: s,
-          totalTaken: weekly.totalTaken,
-          streak,
-          earnedBadges: earned,
-        });
+    void loadData()
+      .then((d) => {
+        setData(d);
         setStatus('ready');
-      } catch {
-        setStatus('error');
-      }
-    })();
+      })
+      .catch(() => setStatus('error'));
+  }, []);
+
+  // Refresh timer state every 30 s — sidebar stays open indefinitely
+  useEffect(() => {
+    const id = setInterval(() => {
+      void browser.runtime
+        .sendMessage({ type: 'GET_STATE' } satisfies Message)
+        .then((raw) =>
+          setData((prev) => (prev ? { ...prev, timerState: raw as TimerState, syncedAt: Date.now() } : prev))
+        )
+        .catch(() => undefined);
+    }, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   function handleFocusToggle(): void {
@@ -175,9 +211,7 @@ export default function App() {
         timerState: {
           ...prev.timerState,
           focusModeEnabled: nowEnabled,
-          reminderIntervalMin: nowEnabled
-            ? prev.settings.focus_mode_interval_min
-            : prev.settings.reminder_interval_min,
+          reminderIntervalMin: effectiveInterval({ ...prev.settings, focus_mode_enabled: nowEnabled }),
         },
       };
     });
@@ -186,7 +220,7 @@ export default function App() {
 
   if (status === 'loading') {
     return (
-      <div className="flex w-80 items-center justify-center py-10 bg-bm-surface">
+      <div className="flex w-full min-h-screen items-center justify-center bg-bm-surface">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-bm-accent border-t-transparent" />
       </div>
     );
@@ -194,7 +228,7 @@ export default function App() {
 
   if (status === 'error' || data === null) {
     return (
-      <div className="w-80 p-4 bg-bm-surface">
+      <div className="w-full min-h-screen p-4 bg-bm-surface">
         <p className="text-sm text-bm-warning">Failed to load. Please reopen the extension.</p>
       </div>
     );
@@ -202,15 +236,24 @@ export default function App() {
 
   if (view === 'settings') {
     return (
-      <div className="w-80 bg-bm-surface flex flex-col" style={{ maxHeight: '560px' }}>
+      <div className="w-full min-h-screen bg-bm-surface flex flex-col">
         <div className="flex items-center gap-2 border-b border-bm-border px-4 py-3 flex-shrink-0">
           <button
             onClick={() => setView('main')}
             aria-label="Back"
             className="rounded-full p-1 text-bm-text-muted transition-colors hover:bg-bm-elevated hover:text-bm-text-secondary"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                clipRule="evenodd"
+              />
             </svg>
           </button>
           <h2 className="text-sm font-semibold text-bm-text-primary">Settings</h2>
@@ -226,9 +269,7 @@ export default function App() {
                   settings: newSettings,
                   timerState: {
                     ...prev.timerState,
-                    reminderIntervalMin: newSettings.focus_mode_enabled
-                      ? newSettings.focus_mode_interval_min
-                      : newSettings.reminder_interval_min,
+                    reminderIntervalMin: effectiveInterval(newSettings),
                   },
                 };
               })
@@ -240,7 +281,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-80 bg-bm-surface">
+    <div className="w-full min-h-screen bg-bm-surface flex flex-col">
       {/* Header */}
       <div className="border-b border-bm-border px-4 py-4">
         <div className="flex items-center justify-between mb-3">
@@ -253,22 +294,24 @@ export default function App() {
         </div>
         <TimerDisplay
           activeSeconds={data.timerState.activeSeconds}
+          isSystemActive={data.timerState.isSystemActive}
           intervalMin={data.timerState.reminderIntervalMin}
           snoozeEndsAt={data.timerState.snoozeEndsAt}
           snoozeTotalSec={data.timerState.snoozeTotalSec}
+          syncedAt={data.syncedAt}
         />
       </div>
 
-      <div className="px-4 py-3 space-y-4">
+      <div className="px-4 py-3 space-y-4 flex-1">
         {/* Weekly Stats */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 rounded-xl border border-bm-border bg-bm-bg p-3 text-center">
-            <p className="text-2xl font-bold text-bm-accent">{data.totalTaken}</p>
-            <p className="text-xs text-bm-text-muted">breaks this week</p>
+          <div className="flex-1 rounded-xl border border-bm-border bg-bm-elevated p-3 text-center">
+            <p className="text-3xl font-bold text-bm-accent">{data.totalTaken}</p>
+            <p className="mt-0.5 text-xs text-bm-text-muted">breaks this week</p>
           </div>
-          <div className="flex-1 rounded-xl border border-bm-border bg-bm-bg p-3 text-center">
-            <p className="text-2xl font-bold text-bm-accent">{data.streak}</p>
-            <p className="text-xs text-bm-text-muted">day streak 🔥</p>
+          <div className="flex-1 rounded-xl border border-bm-border bg-bm-elevated p-3 text-center">
+            <p className="text-3xl font-bold text-bm-accent">{data.streak}</p>
+            <p className="mt-0.5 text-xs text-bm-text-muted">day streak 🔥</p>
           </div>
         </div>
 
@@ -292,7 +335,9 @@ export default function App() {
           </div>
           <button
             onClick={handleFocusToggle}
-            aria-label={data.settings.focus_mode_enabled ? 'Disable Focus Mode' : 'Enable Focus Mode'}
+            aria-label={
+              data.settings.focus_mode_enabled ? 'Disable Focus Mode' : 'Enable Focus Mode'
+            }
             className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
               data.settings.focus_mode_enabled ? 'bg-bm-accent' : 'bg-bm-border'
             }`}

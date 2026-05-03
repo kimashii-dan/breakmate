@@ -5,9 +5,8 @@ import * as exercisesQueries from '../db/queries/exercises';
 import { getDb } from '../db/client';
 import { calcStreak } from '../lib/streak';
 import { isChronicSnoozer } from '../lib/snoozer';
-import { shouldTrigger } from '../lib/timer';
+import { shouldTrigger, effectiveInterval } from '../lib/timer';
 import type { BreakType, Message, SnoozeDuration, TimerState } from '../types';
-import type { BreakRecord } from '../db/types';
 
 const ALARM_IDLE_CHECK = 'idle-check';
 const ALARM_SNOOZE = 'snooze';
@@ -29,17 +28,34 @@ let pendingBreak: PendingBreak | null = null;
 let snoozeEndsAt: number | null = null;
 let snoozeTotalSec: number | null = null;
 
+const VALID_MESSAGE_TYPES = new Set<string>([
+  'GET_STATE',
+  'TOGGLE_FOCUS_MODE',
+  'SNOOZE',
+  'BREAK_TAKEN',
+  'BREAK_DISMISSED',
+  'SETTINGS_CHANGED',
+]);
+
 function isMessage(value: unknown): value is Message {
   return (
     typeof value === 'object' &&
     value !== null &&
     'type' in value &&
-    typeof (value as Record<string, unknown>).type === 'string'
+    typeof (value as Record<string, unknown>).type === 'string' &&
+    VALID_MESSAGE_TYPES.has((value as Record<string, unknown>).type as string)
   );
 }
 
 async function ensureIdleCheckAlarm(): Promise<void> {
   await browser.alarms.create(ALARM_IDLE_CHECK, { periodInMinutes: 0.5 });
+}
+
+type SidePanel = { setPanelBehavior: (o: { openPanelOnActionClick: boolean }) => Promise<void> };
+
+async function enableSidebarOnClick(): Promise<void> {
+  const sp = (globalThis as unknown as { chrome?: { sidePanel?: SidePanel } }).chrome?.sidePanel;
+  if (sp) await sp.setPanelBehavior({ openPanelOnActionClick: true });
 }
 
 async function openReminderWindow(breakType: BreakType): Promise<void> {
@@ -65,13 +81,8 @@ async function closeReminderWindow(): Promise<void> {
   reminderWindowId = null;
 }
 
-async function getAllBreakRecords(): Promise<BreakRecord[]> {
-  const db = await getDb();
-  return db.getAll('break_records');
-}
-
 async function checkAndAwardBadges(): Promise<void> {
-  const allRecords = await getAllBreakRecords();
+  const allRecords = await (await getDb()).getAll('break_records');
   const allTimeTaken = allRecords.filter((r) => r.outcome === 'taken').length;
   const streak = calcStreak(allRecords);
   const allBadges = await badgesQueries.getAll();
@@ -132,7 +143,7 @@ async function handleToggleFocusMode(): Promise<void> {
   const newEnabled = !s.focus_mode_enabled;
   await settingsQueries.update({ focus_mode_enabled: newEnabled });
   focusModeEnabled = newEnabled;
-  reminderIntervalMin = newEnabled ? s.focus_mode_interval_min : s.reminder_interval_min;
+  reminderIntervalMin = effectiveInterval({ ...s, focus_mode_enabled: newEnabled });
 }
 
 async function handleSnooze(minutes: SnoozeDuration): Promise<void> {
@@ -184,7 +195,7 @@ async function handleSettingsChanged(): Promise<void> {
   const s = await settingsQueries.get();
   if (!s) return;
   focusModeEnabled = s.focus_mode_enabled;
-  reminderIntervalMin = s.focus_mode_enabled ? s.focus_mode_interval_min : s.reminder_interval_min;
+  reminderIntervalMin = effectiveInterval(s);
 }
 
 function dispatchMessage(
@@ -193,7 +204,7 @@ function dispatchMessage(
 ): boolean | void {
   switch (message.type) {
     case 'GET_STATE': {
-      const resp: TimerState = { activeSeconds, focusModeEnabled, reminderIntervalMin, snoozeEndsAt, snoozeTotalSec };
+      const resp: TimerState = { activeSeconds, isSystemActive, focusModeEnabled, reminderIntervalMin, snoozeEndsAt, snoozeTotalSec };
       sendResponse(resp);
       return;
     }
@@ -224,7 +235,7 @@ async function loadSettings(): Promise<void> {
   const s = await settingsQueries.get();
   if (!s) return;
   focusModeEnabled = s.focus_mode_enabled;
-  reminderIntervalMin = s.focus_mode_enabled ? s.focus_mode_interval_min : s.reminder_interval_min;
+  reminderIntervalMin = effectiveInterval(s);
 }
 
 function registerIdleListener(): void {
@@ -239,31 +250,17 @@ function registerIdleListener(): void {
   })();
 }
 
-async function onInstalled(): Promise<void> {
-  await settingsQueries.initDefaults();
-  await exercisesQueries.seedDefaults();
-  await badgesQueries.seedBadges();
-  await loadSettings();
-  await ensureIdleCheckAlarm();
-}
-
-async function onStartup(): Promise<void> {
-  await loadSettings();
-  await ensureIdleCheckAlarm();
-}
-
 async function init(): Promise<void> {
   await settingsQueries.initDefaults();
   await exercisesQueries.seedDefaults();
   await badgesQueries.seedBadges();
   await loadSettings();
   await ensureIdleCheckAlarm();
+  await enableSidebarOnClick();
 }
 
 function registerListeners(): void {
   registerIdleListener();
-  browser.runtime.onInstalled.addListener(() => void onInstalled());
-  browser.runtime.onStartup.addListener(() => void onStartup());
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === ALARM_IDLE_CHECK) {
       void handleIdleCheck();

@@ -12,6 +12,7 @@ export type Message =
 
 export type TimerState = {
   activeSeconds: number;
+  isSystemActive: boolean;
   focusModeEnabled: boolean;
   reminderIntervalMin: number;
   snoozeEndsAt: number | null;

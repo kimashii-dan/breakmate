@@ -73,22 +73,29 @@ function ExerciseTimer({ exercise, onComplete }: ExerciseTimerProps) {
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-        <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-bm-accent bg-bm-accent-muted">
+        <div
+          className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-bm-accent bg-bm-accent-muted"
+          style={{ boxShadow: '0 0 32px var(--bm-accent-subtle)' }}
+        >
           <span className="text-3xl font-bold tabular-nums text-bm-accent">{timeDisplay}</span>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-bm-border">
+        <div className="h-1.5 w-full rounded-full bg-bm-border">
           <div
-            className="h-2 rounded-full bg-bm-accent transition-all duration-1000"
-            style={{ width: `${progressPct}%` }}
+            className="h-1.5 rounded-full transition-all duration-1000"
+            style={{
+              width: `${progressPct}%`,
+              background: 'linear-gradient(90deg, var(--bm-accent-muted), var(--bm-accent))',
+              boxShadow: '0 0 6px var(--bm-accent)',
+            }}
           />
         </div>
 
         <div className="w-full rounded-xl border border-bm-border bg-bm-surface px-6 py-4 text-center">
-          <p className="mb-1 text-xs font-medium text-bm-text-muted">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-bm-text-muted">
             Step {currentStep + 1} of {stepCount}
           </p>
-          <p className="text-sm font-medium text-bm-text-secondary">
+          <p className="text-sm font-medium leading-relaxed text-bm-text-secondary">
             {exercise.instructions[currentStep]}
           </p>
         </div>
@@ -96,7 +103,8 @@ function ExerciseTimer({ exercise, onComplete }: ExerciseTimerProps) {
         {finished && (
           <button
             onClick={handleDone}
-            className="w-full rounded-xl bg-bm-accent py-3 text-base font-semibold text-bm-bg transition-colors hover:bg-bm-accent-hover active:bg-bm-accent-hover"
+            className="w-full rounded-xl bg-bm-accent py-3.5 text-base font-semibold text-bm-bg transition-all hover:bg-bm-accent-hover active:bg-bm-accent-hover"
+            style={{ boxShadow: '0 4px 16px var(--bm-accent-subtle)' }}
           >
             {"I'm done! ✓"}
           </button>
@@ -142,25 +150,28 @@ function ChoosingPhase({ breakType, onStart, onSnooze, onDismiss }: ChoosingPhas
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-        <h1 className="text-2xl font-bold text-bm-text-primary">Time for a break!</h1>
-        <p className="text-center text-sm text-bm-text-secondary">{BREAK_DESCRIPTIONS[breakType]}</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-bm-text-primary">Time for a break!</h1>
+          <p className="mt-2 text-sm text-bm-text-secondary">{BREAK_DESCRIPTIONS[breakType]}</p>
+        </div>
         <button
           onClick={onStart}
-          className="w-full max-w-xs rounded-xl bg-bm-accent py-3 text-base font-semibold text-bm-bg transition-colors hover:bg-bm-accent-hover active:bg-bm-accent-hover"
+          className="w-full max-w-xs rounded-xl bg-bm-accent py-3.5 text-base font-semibold text-bm-bg transition-all hover:bg-bm-accent-hover active:bg-bm-accent-hover"
+          style={{ boxShadow: '0 4px 20px var(--bm-accent-subtle)' }}
         >
           Start Break
         </button>
       </div>
 
-      <div className="border-t border-bm-border px-6 py-4">
-        <p className="mb-2 text-center text-xs font-medium text-bm-text-muted">Snooze for…</p>
-        <div className="flex justify-center gap-3">
+      <div className="border-t border-bm-border px-6 py-5">
+        <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-bm-text-muted">Snooze for…</p>
+        <div className="flex justify-center gap-2">
           {SNOOZE_OPTIONS.map((m) => (
             <button
               key={m}
               onClick={() => onSnooze(m)}
-              className="rounded-lg border border-bm-border px-4 py-2 text-sm font-medium text-bm-text-secondary transition-colors hover:border-bm-accent hover:text-bm-accent"
+              className="rounded-lg border border-bm-border bg-bm-elevated px-5 py-2 text-sm font-medium text-bm-text-secondary transition-colors hover:border-bm-accent hover:text-bm-accent"
             >
               {m} min
             </button>

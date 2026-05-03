@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'BreakMate',
     description: 'Health break reminder — activity-aware, local-only, privacy-first.',
     version: '0.0.1',
-    permissions: ['alarms', 'idle', 'storage', 'windows'],
+    permissions: ['alarms', 'idle', 'sidePanel', 'storage', 'windows'],
     icons: {
       16: 'icons/icon16.png',
       32: 'icons/icon32.png',

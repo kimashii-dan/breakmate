@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldTrigger } from '../../src/lib/timer';
+import { shouldTrigger, effectiveInterval } from '../../src/lib/timer';
 
 describe('shouldTrigger', () => {
   it('returns false when activeSeconds is 0', () => {
@@ -26,5 +26,17 @@ describe('shouldTrigger', () => {
   it('works with 90-minute interval (focus mode)', () => {
     expect(shouldTrigger(5399, 90)).toBe(false);
     expect(shouldTrigger(5400, 90)).toBe(true);
+  });
+});
+
+describe('effectiveInterval', () => {
+  const base = { reminder_interval_min: 60, focus_mode_interval_min: 90 };
+
+  it('returns reminder_interval_min when focus mode off', () => {
+    expect(effectiveInterval({ ...base, focus_mode_enabled: false })).toBe(60);
+  });
+
+  it('returns focus_mode_interval_min when focus mode on', () => {
+    expect(effectiveInterval({ ...base, focus_mode_enabled: true })).toBe(90);
   });
 });

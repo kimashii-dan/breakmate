@@ -61,12 +61,13 @@ function ExerciseGroup({ title, exercises, onToggle }: ExerciseGroupProps) {
   );
 }
 
+const THEME_LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
+
 // --- SettingsPanel -------------------------------------------------------
 
 export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [exercisesLoaded, setExercisesLoaded] = useState(false);
   const [theme, setTheme] = useState<Theme>(getStoredTheme);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -80,7 +81,6 @@ export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
       const [s, exs] = await Promise.all([settingsQueries.get(), exercisesQueries.getAll()]);
       if (s) setSettings(s);
       setExercises([...exs].sort((a, b) => a.sort_order - b.sort_order));
-      setExercisesLoaded(true);
     })();
     return () => {
       if (debounceRef.current !== null) clearTimeout(debounceRef.current);
@@ -119,8 +119,6 @@ export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
 
   const eyeExercises = exercises.filter((e) => e.type === 'eye');
   const bodyExercises = exercises.filter((e) => e.type === 'full_body');
-
-  const THEME_LABELS: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
   return (
     <div className="divide-y divide-bm-border">
@@ -203,24 +201,20 @@ export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
           <span className="font-medium text-bm-accent">{settings.focus_mode_interval_min} min</span>{' '}
           for uninterrupted work sessions.
         </p>
-        <p className="text-xs text-bm-text-muted">Toggle via the main popup view.</p>
+        <p className="text-xs text-bm-text-muted">Toggle via the side panel.</p>
       </div>
 
       {/* Exercise Library */}
       <div className="px-4 py-4 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-bm-accent">Exercise Library</p>
-        {!exercisesLoaded ? (
-          <p className="text-xs text-bm-text-muted">Loading…</p>
-        ) : (
-          <div className="space-y-4">
-            {eyeExercises.length > 0 && (
-              <ExerciseGroup title="Eye Breaks" exercises={eyeExercises} onToggle={handleExerciseToggle} />
-            )}
-            {bodyExercises.length > 0 && (
-              <ExerciseGroup title="Full Body Breaks" exercises={bodyExercises} onToggle={handleExerciseToggle} />
-            )}
-          </div>
-        )}
+        <div className="space-y-4">
+          {eyeExercises.length > 0 && (
+            <ExerciseGroup title="Eye Breaks" exercises={eyeExercises} onToggle={handleExerciseToggle} />
+          )}
+          {bodyExercises.length > 0 && (
+            <ExerciseGroup title="Full Body Breaks" exercises={bodyExercises} onToggle={handleExerciseToggle} />
+          )}
+        </div>
       </div>
     </div>
   );

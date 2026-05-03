@@ -23,8 +23,8 @@ export async function initDefaults(): Promise<void> {
     focus_mode_interval_min: 90,
     focus_mode_enabled: false,
     default_break_type: 'eye',
-    onboarding_completed: false,
     chronic_snoozer_flag: false,
+    onboarding_completed: false,
   };
   await db.put('settings', defaults);
 }

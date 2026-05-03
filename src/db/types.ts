@@ -9,8 +9,8 @@ export interface Settings {
   focus_mode_interval_min: number;
   focus_mode_enabled: boolean;
   default_break_type: BreakType;
-  onboarding_completed: boolean;
   chronic_snoozer_flag: boolean;
+  onboarding_completed: boolean;
 }
 
 export interface BreakRecord {
